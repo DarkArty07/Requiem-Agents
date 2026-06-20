@@ -5,6 +5,12 @@ model:
 memory:
   memory_char_limit: 32000
   user_char_limit: 24000
+platform_toolsets:
+  cli:
+    - memory
+    - skills
+    - todo
+    - requiem-mcp
 mcp_servers:
   requiem-mcp:
     command: /home/prometeo/Requiem/raven/.venv/bin/python3.11
