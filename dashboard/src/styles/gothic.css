@@ -1,0 +1,415 @@
+/* ════════════════════════════════════════════════════════════════
+   Requiem Agents — Gothic Horror Theme
+   Dark, cold, angular, blood red accents
+   ════════════════════════════════════════════════════════════════ */
+
+/* ── Reset & Base ───────────────────────────────────────────── */
+*, *::before, *::after {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html {
+  font-size: 16px;
+  scrollbar-color: #333 #0a0a0a;
+  scrollbar-width: thin;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #0a0a0a;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #333;
+  border: none;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
+
+body {
+  background: #0a0a0a;
+  color: #c0c0c0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  line-height: 1.5;
+  min-height: 100vh;
+}
+
+/* ── App Layout ─────────────────────────────────────────────── */
+.app {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+.app-header {
+  text-align: center;
+  padding: 32px 0;
+  border-bottom: 1px solid #333;
+  margin-bottom: 32px;
+}
+
+.app-title {
+  font-family: 'Cinzel', serif;
+  font-weight: 700;
+  font-size: 2.5rem;
+  text-transform: uppercase;
+  letter-spacing: 6px;
+  color: #c0c0c0;
+  margin-bottom: 4px;
+}
+
+.app-subtitle {
+  font-family: 'Cinzel', serif;
+  font-weight: 400;
+  font-size: 0.9rem;
+  letter-spacing: 3px;
+  color: #666;
+  text-transform: uppercase;
+}
+
+.app-error {
+  margin-top: 12px;
+  padding: 8px 16px;
+  background: rgba(139, 0, 0, 0.15);
+  border: 1px solid #8b0000;
+  color: #ff4444;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.8rem;
+  display: inline-block;
+}
+
+/* ── Grid ───────────────────────────────────────────────────── */
+.app-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 16px;
+}
+
+.grid-item {
+  background: #1a1a1a;
+  border: 1px solid #333;
+  padding: 16px;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.grid-item:hover {
+  border-color: #8b0000;
+  box-shadow: 0 0 12px rgba(139, 0, 0, 0.15);
+}
+
+.grid-item--full {
+  grid-column: 1 / -1;
+}
+
+.grid-item__title {
+  font-family: 'Cinzel', serif;
+  font-weight: 600;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 3px;
+  color: #8b0000;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #333;
+}
+
+/* ── Mono Data ──────────────────────────────────────────────── */
+.mono {
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.stat-value {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 2rem;
+  font-weight: 300;
+  color: #e0e0e0;
+  line-height: 1.2;
+}
+
+.stat-label {
+  font-family: 'Cinzel', serif;
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  color: #666;
+}
+
+/* ── Token Bar ──────────────────────────────────────────────── */
+.token-bar {
+  position: relative;
+  height: 12px;
+  background: #2a2a2a;
+  margin: 8px 0;
+  overflow: hidden;
+}
+
+.token-bar__fill {
+  height: 100%;
+  background: #444;
+  transition: width 0.5s ease;
+}
+
+.token-bar__fill--high {
+  background: #8b0000;
+  box-shadow: 0 0 8px rgba(139, 0, 0, 0.5);
+}
+
+.token-bar__fill--medium {
+  background: #8b6f00;
+}
+
+.token-bar__fill--low {
+  background: #335533;
+}
+
+/* ── Stats Grid ─────────────────────────────────────────────── */
+.stats-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.stat-item {
+  text-align: center;
+  padding: 8px 4px;
+}
+
+/* ── Agent Table ────────────────────────────────────────────── */
+.agent-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.agent-table th {
+  font-family: 'Cinzel', serif;
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  color: #666;
+  text-align: left;
+  padding: 6px 8px;
+  border-bottom: 1px solid #333;
+}
+
+.agent-table td {
+  padding: 6px 8px;
+  border-bottom: 1px solid #222;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.8rem;
+}
+
+.agent-table tbody tr:hover {
+  background: rgba(139, 0, 0, 0.08);
+}
+
+/* ── Config ─────────────────────────────────────────────────── */
+.config-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.config-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.config-label {
+  font-family: 'Cinzel', serif;
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: #999;
+  min-width: 130px;
+}
+
+.config-select {
+  flex: 1;
+  background: #0a0a0a;
+  color: #c0c0c0;
+  border: 1px solid #444;
+  padding: 4px 8px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+.config-select:focus {
+  outline: none;
+  border-color: #8b0000;
+  box-shadow: 0 0 6px rgba(139, 0, 0, 0.3);
+}
+
+.config-save {
+  margin-top: 12px;
+  padding: 8px 24px;
+  background: #0a0a0a;
+  color: #8b0000;
+  border: 1px solid #8b0000;
+  font-family: 'Cinzel', serif;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.config-save:hover {
+  background: #8b0000;
+  color: #0a0a0a;
+}
+
+.config-save:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.config-status {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.7rem;
+  color: #666;
+  text-align: center;
+  margin-top: 8px;
+}
+
+/* ── Activity Log ───────────────────────────────────────────── */
+.activity-list {
+  max-height: 400px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.activity-entry {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  font-size: 0.78rem;
+  border-bottom: 1px solid #1a1a1a;
+}
+
+.activity-entry:hover {
+  background: rgba(139, 0, 0, 0.06);
+}
+
+.activity-time {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.7rem;
+  color: #555;
+  white-space: nowrap;
+  min-width: 85px;
+}
+
+.activity-agent {
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 500;
+  font-size: 0.72rem;
+  white-space: nowrap;
+  min-width: 95px;
+}
+
+.activity-agent--raven { color: #8b0000; }
+.activity-agent--necromancer { color: #9966cc; }
+.activity-agent--revenant { color: #cc6633; }
+.activity-agent--shade { color: #6699cc; }
+
+.activity-action {
+  flex: 1;
+  color: #999;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.activity-result {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.65rem;
+  padding: 2px 8px;
+  min-width: 40px;
+  text-align: center;
+}
+
+.activity-result--pass {
+  background: rgba(0, 100, 0, 0.3);
+  color: #55cc55;
+  border: 1px solid #335533;
+}
+
+.activity-result--fail {
+  background: rgba(139, 0, 0, 0.2);
+  color: #ff4444;
+  border: 1px solid #8b0000;
+}
+
+.activity-result--escalated {
+  background: rgba(139, 69, 0, 0.2);
+  color: #ff8800;
+  border: 1px solid #8b4500;
+}
+
+.activity-result--default {
+  color: #666;
+}
+
+/* ── Project Info ───────────────────────────────────────────── */
+.project-info__name {
+  font-family: 'Cinzel', serif;
+  font-weight: 700;
+  font-size: 1.2rem;
+  text-transform: uppercase;
+  letter-spacing: 4px;
+  color: #8b0000;
+  margin-bottom: 8px;
+}
+
+.project-info__desc {
+  font-size: 0.85rem;
+  color: #999;
+  margin-bottom: 12px;
+}
+
+.project-info__link {
+  display: inline-block;
+  color: #8b0000;
+  text-decoration: none;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.8rem;
+  border: 1px solid #333;
+  padding: 4px 12px;
+  margin-bottom: 12px;
+  transition: all 0.2s;
+}
+
+.project-info__link:hover {
+  border-color: #8b0000;
+  box-shadow: 0 0 8px rgba(139, 0, 0, 0.3);
+}
+
+.project-info__arch {
+  font-size: 0.8rem;
+  color: #777;
+  line-height: 1.8;
+}
+
+.project-info__arch strong {
+  color: #c0c0c0;
+  font-weight: 500;
+}
+
+.project-info__arch span {
+  display: inline-block;
+  margin: 0 4px;
+  color: #8b0000;
+}
