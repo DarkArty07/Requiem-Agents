@@ -41,14 +41,14 @@ def extract_file_paths(text: str, project_root: str) -> list:
         re.IGNORECASE,
     ):
         candidate = match.group(1).rstrip(".,;:")
-        if os.path.exists(candidate):
+        if os.path.isfile(candidate):
             paths.add(candidate)
 
     # Pattern: absolute paths under project_root (e.g. /home/prometeo/Requiem/some/file.py)
     escaped_root = re.escape(project_root)
     for match in re.finditer(rf'{escaped_root}\S+', text):
         candidate = match.group(0).rstrip(".,;:")
-        if os.path.exists(candidate):
+        if os.path.isfile(candidate):
             paths.add(candidate)
 
     # Pattern: lines starting with / that exist as files on disk
@@ -125,10 +125,6 @@ async def audit(
 
     # Extract file paths from Shade output and read actual files
     file_paths = extract_file_paths(shade_output, project_root)
-
-    print(f"  [DEBUG audit] file_paths count={len(file_paths)}", flush=True)
-    print(f"  [DEBUG audit] file_paths list={file_paths}", flush=True)
-    print(f"  [DEBUG audit] shade_name={shade_name}", flush=True)
 
     # Pre-check: if task requires creating files but none exist, auto-fail
     task_lower = task_spec.lower()

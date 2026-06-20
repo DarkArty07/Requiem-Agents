@@ -87,6 +87,8 @@ def parse_tool_calls(content: str) -> list:
 
         if brace_count == 0:
             json_str = content[start:end]
+            # Fix model's erroneous single-quote escaping (\\'  -> ')
+            json_str = json_str.replace("\\'", "'")
             try:
                 parsed = json.loads(json_str, strict=False)
                 tc = parsed.get("tool_call", {})
@@ -104,8 +106,45 @@ def parse_tool_calls(content: str) -> list:
                     pass
             search_start = end
         else:
-            # Unbalanced braces — skip past this match to avoid infinite loop
-            search_start = idx + len('{"tool_call":')
+            # Unbalanced braces — try to repair by appending missing closing braces
+            json_str = content[start:]
+            json_str = json_str.replace("\\'", "'")
+            open_count = 0
+            close_count = 0
+            repair_in_string = False
+            repair_escape = False
+            for ch in json_str:
+                if repair_escape:
+                    repair_escape = False
+                    continue
+                if ch == "\\":
+                    repair_escape = True
+                    continue
+                if ch == '"' and not repair_escape:
+                    repair_in_string = not repair_in_string
+                    continue
+                if not repair_in_string:
+                    if ch == "{":
+                        open_count += 1
+                    elif ch == "}":
+                        close_count += 1
+            missing = open_count - close_count
+            repaired = False
+            if missing > 0:
+                json_str += "}" * missing
+                try:
+                    parsed = json.loads(json_str, strict=False)
+                    tc = parsed.get("tool_call", {})
+                    if tc.get("name") and tc.get("args") is not None:
+                        results.append({"name": tc["name"], "args": tc["args"]})
+                        repaired = True
+                except (json.JSONDecodeError, ValueError):
+                    pass
+            if repaired:
+                search_start = len(content)
+            else:
+                # Unbalanced braces — skip past this match to avoid infinite loop
+                search_start = idx + len('{"tool_call":')
 
     return results
 
@@ -232,6 +271,10 @@ Execute this task using your tools."""
             print(f"  [Shade {shade_name}] Context budget exceeded ({total_input_tokens} tokens), stopping.", flush=True)
             break
 
+        # Force research shade to write summary at halfway point
+        if shade_name == "research" and iteration >= 10:
+            messages.append({"role": "user", "content": "You have done enough research. Please write your findings summary now WITHOUT any tool_call JSON. Just output your report."})
+
         iteration_count = iteration + 1
 
     duration = time.time() - start_time
@@ -253,10 +296,6 @@ Execute this task using your tools."""
         final_content += "\n\n## Files Created/Modified\n"
         for fp in files_written:
             final_content += f"- File written: {fp}\n"
-
-    print(f"  [DEBUG run_shade] files_written count={len(files_written)}", flush=True)
-    print(f"  [DEBUG run_shade] files_written list={files_written}", flush=True)
-    print(f"  [DEBUG run_shade] final_content last 200 chars: ...{repr(final_content[-200:])}", flush=True)
 
     return {
         "output": final_content,
