@@ -114,6 +114,7 @@ async def audit(
     project_root: str,
     session_id: str,
     task_id: str,
+    shade_name: str = "programming",
 ) -> dict:
     """Audit a Shade's output. Reads actual files and compiles .py to verify work.
 
@@ -125,11 +126,15 @@ async def audit(
     # Extract file paths from Shade output and read actual files
     file_paths = extract_file_paths(shade_output, project_root)
 
+    print(f"  [DEBUG audit] file_paths count={len(file_paths)}", flush=True)
+    print(f"  [DEBUG audit] file_paths list={file_paths}", flush=True)
+    print(f"  [DEBUG audit] shade_name={shade_name}", flush=True)
+
     # Pre-check: if task requires creating files but none exist, auto-fail
     task_lower = task_spec.lower()
     creation_words = ['create', 'write', 'implement', 'build', 'add', 'generate']
     is_creation_task = any(w in task_lower for w in creation_words)
-    if is_creation_task and not file_paths:
+    if shade_name == "programming" and is_creation_task and not file_paths:
         duration = time.time() - start_time
         log_agent_call(
             session_id=session_id, agent_name='revenant',

@@ -254,6 +254,10 @@ Execute this task using your tools."""
         for fp in files_written:
             final_content += f"- File written: {fp}\n"
 
+    print(f"  [DEBUG run_shade] files_written count={len(files_written)}", flush=True)
+    print(f"  [DEBUG run_shade] files_written list={files_written}", flush=True)
+    print(f"  [DEBUG run_shade] final_content last 200 chars: ...{repr(final_content[-200:])}", flush=True)
+
     return {
         "output": final_content,
         "input_tokens": total_input_tokens,
@@ -354,9 +358,9 @@ Respond in JSON format:
                 shade_name, shade_task, project_root, session_id, task_id
             )
 
-            # Audit with Revenant — now passes project_root so it can read actual files
+            # Audit with Revenant — now passes project_root and shade_name
             audit_result = await audit(
-                shade_result["output"], shade_task, project_root, session_id, task_id
+                shade_result["output"], shade_task, project_root, session_id, task_id, shade_name
             )
 
             if audit_result["verdict"] == "pass":
