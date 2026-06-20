@@ -1,23 +1,23 @@
-# Requiem Agents — Raven Configuration
-# Raven is the assistant. The only agent that uses hermes-agent framework.
-
 model:
   provider: opencode-go
   model: deepseek-v4-pro
   context_length: 262144
-
 memory:
   memory_char_limit: 32000
   user_char_limit: 24000
-
 mcp_servers:
   requiem-mcp:
     command: /home/prometeo/Requiem/raven/.venv/bin/python3.11
     args:
-      - -m
-      - requiem_mcp.server
+    - -m
+    - requiem_mcp.server
     enabled: true
     env:
       REQUIEM_PROJECT_ROOT: /home/prometeo/Requiem
       OPENCODE_GO_API_KEY: ${OPENCODE_GO_API_KEY}
+      PYTHONPATH: /home/prometeo/Requiem
     timeout: 600
+onboarding:
+  seen:
+    openclaw_residue_cleanup: true
+    tool_progress_prompt: true

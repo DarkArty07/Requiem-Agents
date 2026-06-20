@@ -38,3 +38,19 @@ Thumbs.db
 
 # Aether Agents
 .aether/
+requiem_mcp
+
+# Raven runtime
+raven/auth.json
+raven/auth.lock
+raven/bin/
+raven/cache/
+raven/logs/
+raven/skills/
+raven/state.db*
+raven/.hermes_history
+raven/.skills_prompt_snapshot.json
+raven/.update_check
+raven/models_dev_cache.json
+raven/ollama_cloud_models_cache.json
+raven/provider_models_cache.json

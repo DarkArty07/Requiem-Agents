@@ -1,13 +1,16 @@
 """Revenant — Auditor module. Invoked by Necromancer after each Shade completes."""
 import os
 import sys
+import re
 import json
 import time
+import subprocess
 
 sys.path.insert(0, os.environ.get("REQUIEM_PROJECT_ROOT", "/home/prometeo/Requiem"))
 
 from shared.opencode_client import chat_completion
 from shared.eval import log_agent_call
+from necromancer.tools import read_file as tools_read_file
 
 REVENANT_MODEL = os.environ.get("REVENANT_MODEL", "glm-5.2")
 
@@ -21,10 +24,141 @@ def load_soul() -> str:
         return f.read()
 
 
-async def audit(shade_output: str, task_spec: str, session_id: str, task_id: str) -> dict:
-    """Audit a Shade's output. Returns dict with verdict, reason, suggestion."""
+def extract_file_paths(text: str, project_root: str) -> list:
+    """Extract likely file paths from Shade output text.
+
+    Scans for:
+    - Lines with "File written:", "File created:", etc. followed by a path
+    - Absolute paths under project_root
+    - Lines ending in known source extensions that exist on disk
+    """
+    paths = set()
+
+    # Pattern: "File written: /path/to/file" or "File created: /path" etc.
+    for match in re.finditer(
+        r'(?:File written:|File created:|Modified:|Created:|Written to:|Wrote)\s*(\S+)',
+        text,
+        re.IGNORECASE,
+    ):
+        candidate = match.group(1).rstrip(".,;:")
+        if os.path.exists(candidate):
+            paths.add(candidate)
+
+    # Pattern: absolute paths under project_root (e.g. /home/prometeo/Requiem/some/file.py)
+    escaped_root = re.escape(project_root)
+    for match in re.finditer(rf'{escaped_root}\S+', text):
+        candidate = match.group(0).rstrip(".,;:")
+        if os.path.exists(candidate):
+            paths.add(candidate)
+
+    # Pattern: lines starting with / that exist as files on disk
+    for line in text.split('\n'):
+        stripped = line.strip().rstrip(".,;:")
+        if stripped.startswith('/'):
+            # Could be an absolute path — verify it exists
+            if os.path.isfile(stripped):
+                paths.add(stripped)
+
+    return sorted(paths)
+
+
+def compile_py_file(filepath: str) -> str:
+    """Run python -m py_compile on a file, return result string."""
+    try:
+        result = subprocess.run(
+            [sys.executable, '-m', 'py_compile', filepath],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        if result.returncode == 0:
+            return f"- {filepath}: OK (syntax valid)"
+        else:
+            stderr = result.stderr.strip() or "(no stderr output)"
+            return f"- {filepath}: SYNTAX ERROR\n  {stderr}"
+    except subprocess.TimeoutExpired:
+        return f"- {filepath}: TIMEOUT (py_compile exceeded 30s)"
+    except Exception as e:
+        return f"- {filepath}: ERROR — {e}"
+
+
+def parse_verdict(content: str) -> str:
+    """Robustly parse a VERDICT: PASS or VERDICT: FAIL from Revenant output.
+
+    Searches line by line for VERDICT markers, then falls back to last-200
+    char scan for standalone PASS/FAIL tokens.
+    """
+    content_upper = content.upper()
+    # Look for VERDICT: PASS or VERDICT: FAIL on individual lines
+    for line in content.split('\n'):
+        line_upper = line.upper()
+        if 'VERDICT:' in line_upper:
+            if 'PASS' in line_upper:
+                return "pass"
+            elif 'FAIL' in line_upper:
+                return "fail"
+    # Fallback: look for standalone PASS/FAIL in the last 200 chars
+    last_200 = content_upper[-200:]
+    has_pass = 'PASS' in last_200
+    has_fail = 'FAIL' in last_200
+    if has_pass and not has_fail:
+        return "pass"
+    if has_fail:
+        return "fail"
+    return "fail"  # Default to fail if unclear
+
+
+async def audit(
+    shade_output: str,
+    task_spec: str,
+    project_root: str,
+    session_id: str,
+    task_id: str,
+) -> dict:
+    """Audit a Shade's output. Reads actual files and compiles .py to verify work.
+
+    Returns dict with verdict, feedback, and token counts.
+    """
     system_prompt = load_soul()
-    
+    start_time = time.time()
+
+    # Extract file paths from Shade output and read actual files
+    file_paths = extract_file_paths(shade_output, project_root)
+
+    # Pre-check: if task requires creating files but none exist, auto-fail
+    task_lower = task_spec.lower()
+    creation_words = ['create', 'write', 'implement', 'build', 'add', 'generate']
+    is_creation_task = any(w in task_lower for w in creation_words)
+    if is_creation_task and not file_paths:
+        duration = time.time() - start_time
+        log_agent_call(
+            session_id=session_id, agent_name='revenant',
+            action='audit', task_id=task_id,
+            duration_seconds=duration, result='fail',
+        )
+        return {
+            'verdict': 'fail',
+            'feedback': 'No files were created. For a task that requires creating code, you MUST use write_file to create the actual files. Do not describe what you would do — USE write_file to create the files NOW.',
+            'input_tokens': 0, 'output_tokens': 0,
+        }
+
+    file_contents = ""
+    compile_results = ""
+    for fp in file_paths:
+        if os.path.isfile(fp):
+            content = tools_read_file(fp)
+            file_contents += f"\n### {fp}\n```\n{content}\n```\n"
+
+            # Compile .py files
+            if fp.endswith('.py'):
+                compile_results += compile_py_file(fp) + "\n"
+
+    if not file_contents:
+        file_contents = "(No files found to verify — Shade may not have created any files, or paths could not be extracted.)"
+
+    if not compile_results:
+        compile_results = "(No .py files to compile.)"
+
     user_message = f"""Review the following Shade output for the task specification.
 
 ## Task Specification
@@ -33,16 +167,20 @@ async def audit(shade_output: str, task_spec: str, session_id: str, task_id: str
 ## Shade Output
 {shade_output}
 
+## Actual Files Created/Modified
+{file_contents}
+
+## Compile Results
+{compile_results}
+
 ## Your Review
 Provide your verdict in this format:
 - VERDICT: PASS or FAIL
 - REASON: [if FAIL, specific actionable feedback]
 - SUGGESTION: [optional improvement]"""
-    
+
     messages = [{"role": "user", "content": user_message}]
-    
-    start_time = time.time()
-    
+
     try:
         result = await chat_completion(
             messages=messages,
@@ -50,15 +188,13 @@ Provide your verdict in this format:
             system_prompt=system_prompt,
             max_tokens=4096,
         )
-        
+
         duration = time.time() - start_time
         content = result["content"]
-        
-        # Parse verdict
-        verdict = "fail"
-        if "PASS" in content.upper().split("VERDICT:")[1][:10] if "VERDICT:" in content else False:
-            verdict = "pass"
-        
+
+        # Parse verdict using robust parser
+        verdict = parse_verdict(content)
+
         # Log the audit call
         log_agent_call(
             session_id=session_id,
@@ -70,7 +206,7 @@ Provide your verdict in this format:
             duration_seconds=duration,
             result=verdict,
         )
-        
+
         return {
             "verdict": verdict,
             "feedback": content,

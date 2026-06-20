@@ -1,6 +1,7 @@
 """Necromancer — Orchestrator service. Receives tasks from MCP, delegates to Shades, invokes Revenant."""
 import os
 import sys
+import re
 import json
 import time
 import uuid
@@ -17,6 +18,96 @@ from necromancer.revenant import audit
 NECROMANCER_MODEL = os.environ.get("NECROMANCER_MODEL", "glm-5.2")
 SHADE_MODEL = os.environ.get("SHADE_MODEL", "deepseek-v4-flash")
 MAX_REVENANT_RETRIES = 3
+
+TOOL_INSTRUCTIONS_TEMPLATE = """
+## Available Tools
+You have the following tools available. To use a tool, output a JSON block on its own line:
+{{"tool_call": {{"name": "tool_name", "args": {{"arg1": "value1", "arg2": "value2"}}}}}}
+
+Available tools:
+{tool_descriptions}
+
+After using a tool, you will see its result. Continue working until the task is complete.
+When you are done, write a summary of what you did WITHOUT any tool_call JSON.
+"""
+
+
+def _build_tool_instructions(tools: dict) -> str:
+    """Build the tool instructions section for the system prompt based on available tools."""
+    descriptions = []
+    if "read_file" in tools:
+        descriptions.append("- read_file(path): Read a file and return its contents")
+    if "write_file" in tools:
+        descriptions.append("- write_file(path, content): Write content to a file (creates parent dirs)")
+    if "search_files" in tools:
+        descriptions.append('- search_files(directory, pattern): Search for files matching a pattern (e.g. "*.py")')
+    if "terminal" in tools:
+        descriptions.append("- terminal(command): Run a shell command and return output")
+    return TOOL_INSTRUCTIONS_TEMPLATE.format(tool_descriptions="\n".join(descriptions))
+
+
+def parse_tool_calls(content: str) -> list:
+    """Parse JSON tool call blocks from model output.
+
+    Looks for {"tool_call": {"name": "...", "args": {...}}} blocks in the text.
+    Returns list of {"name": str, "args": dict}.
+    """
+    results = []
+    search_start = 0
+    while True:
+        idx = content.find('{"tool_call":', search_start)
+        if idx == -1:
+            break
+
+        # Find the complete JSON object by counting braces
+        start = idx
+        brace_count = 0
+        in_string = False
+        escape = False
+        end = start
+        for i in range(start, len(content)):
+            ch = content[i]
+            if escape:
+                escape = False
+                continue
+            if ch == "\\":
+                escape = True
+                continue
+            if ch == '"' and not escape:
+                in_string = not in_string
+                continue
+            if not in_string:
+                if ch == "{":
+                    brace_count += 1
+                elif ch == "}":
+                    brace_count -= 1
+                    if brace_count == 0:
+                        end = i + 1
+                        break
+
+        if brace_count == 0:
+            json_str = content[start:end]
+            try:
+                parsed = json.loads(json_str, strict=False)
+                tc = parsed.get("tool_call", {})
+                if tc.get("name") and tc.get("args") is not None:
+                    results.append({"name": tc["name"], "args": tc["args"]})
+            except (json.JSONDecodeError, ValueError):
+                # Fallback: try with single quotes replaced (some models use them)
+                try:
+                    json_str_fixed = json_str.replace("'", '"')
+                    parsed = json.loads(json_str_fixed, strict=False)
+                    tc = parsed.get("tool_call", {})
+                    if tc.get("name") and tc.get("args") is not None:
+                        results.append({"name": tc["name"], "args": tc["args"]})
+                except (json.JSONDecodeError, ValueError):
+                    pass
+            search_start = end
+        else:
+            # Unbalanced braces — skip past this match to avoid infinite loop
+            search_start = idx + len('{"tool_call":')
+
+    return results
 
 
 def load_soul(path: str) -> str:
@@ -38,9 +129,9 @@ async def run_shade(
     session_id: str,
     task_id: str,
 ) -> dict:
-    """Run a Shade with its system prompt and tools."""
-    system_prompt = load_shade_soul(shade_name)
-    
+    """Run a Shade with an agentic loop — model uses tools until done, max 15 iterations."""
+    base_system_prompt = load_shade_soul(shade_name)
+
     # Select tools based on shade
     if shade_name == "programming":
         tools = WRITE_TOOLS
@@ -51,62 +142,123 @@ async def run_shade(
     else:
         tools = WRITE_TOOLS
         model = SHADE_MODEL
-    
-    # Build the prompt with task context
+
+    # Augment system prompt with tool instructions
+    tool_instructions = _build_tool_instructions(tools)
+    system_prompt = base_system_prompt + tool_instructions
+
+    # Build initial task message
     user_message = f"""## Project Root
 {project_root}
 
 ## Task
 {task}
 
-Execute this task. Use your tools as needed. Report what you did."""
-    
+Execute this task using your tools."""
+
     messages = [{"role": "user", "content": user_message}]
-    
+
+    total_input_tokens = 0
+    total_output_tokens = 0
     start_time = time.time()
-    
-    try:
-        result = await chat_completion(
-            messages=messages,
-            model=model,
-            system_prompt=system_prompt,
-            max_tokens=16384,
-        )
-        
-        duration = time.time() - start_time
-        
-        log_agent_call(
-            session_id=session_id,
-            agent_name=f"shade_of_{shade_name}",
-            action="executed",
-            task_id=task_id,
-            input_tokens=result["input_tokens"],
-            output_tokens=result["output_tokens"],
-            duration_seconds=duration,
-            result="completed",
-        )
-        
-        return {
-            "output": result["content"],
-            "input_tokens": result["input_tokens"],
-            "output_tokens": result["output_tokens"],
-        }
-    except Exception as e:
-        duration = time.time() - start_time
-        log_agent_call(
-            session_id=session_id,
-            agent_name=f"shade_of_{shade_name}",
-            action="executed",
-            task_id=task_id,
-            duration_seconds=duration,
-            result="error",
-            metadata={"error": str(e)},
-        )
-        return {
-            "output": f"Shade error: {e}",
-            "input_tokens": 0,
-            "output_tokens": 0,
-        }
+
+    final_content = ""
+    iteration_count = 0
+    files_written = []
+
+    for iteration in range(15):
+        try:
+            result = await chat_completion(
+                messages=messages,
+                model=model,
+                system_prompt=system_prompt,
+                max_tokens=16384,
+            )
+        except Exception as e:
+            duration = time.time() - start_time
+            log_agent_call(
+                session_id=session_id,
+                agent_name=f"shade_of_{shade_name}",
+                action="executed",
+                task_id=task_id,
+                input_tokens=total_input_tokens,
+                output_tokens=total_output_tokens,
+                duration_seconds=duration,
+                result="error",
+                metadata={"error": str(e), "iteration": iteration},
+            )
+            return {
+                "output": f"Shade error at iteration {iteration}: {e}",
+                "input_tokens": total_input_tokens,
+                "output_tokens": total_output_tokens,
+            }
+
+        total_input_tokens += result.get("input_tokens", 0)
+        total_output_tokens += result.get("output_tokens", 0)
+
+        content = result["content"]
+        final_content = content
+
+        # Parse tool calls from the model response
+        tool_calls = parse_tool_calls(content)
+
+        print(f"  [Shade {shade_name}] Iteration {iteration+1}: {len(tool_calls)} tool calls found", flush=True)
+        for tc in tool_calls:
+            print(f"    -> {tc['name']}({list(tc['args'].keys())})", flush=True)
+
+        if not tool_calls:
+            # No more tool calls — Shade is done
+            iteration_count = iteration + 1
+            break
+
+        # Append assistant response to conversation
+        messages.append({"role": "assistant", "content": content})
+
+        # Execute tools and append results
+        for tc in tool_calls:
+            # Track write_file calls so Revenant can identify created files
+            if tc["name"] == "write_file" and "path" in tc["args"]:
+                files_written.append(tc["args"]["path"])
+            tool_name = tc["name"]
+            tool_args = tc["args"]
+            tool_output = execute_tool(tool_name, tools, **tool_args)
+            # Truncate long tool outputs to prevent context explosion
+            if len(tool_output) > 2000:
+                tool_output = tool_output[:2000] + "\n... (truncated, full output was {} chars)".format(len(tool_output))
+            messages.append({"role": "user", "content": f"Tool result ({tool_name}):\n{tool_output}"})
+
+        # Check context budget after this iteration
+        if total_input_tokens > 50000:
+            print(f"  [Shade {shade_name}] Context budget exceeded ({total_input_tokens} tokens), stopping.", flush=True)
+            break
+
+        iteration_count = iteration + 1
+
+    duration = time.time() - start_time
+
+    log_agent_call(
+        session_id=session_id,
+        agent_name=f"shade_of_{shade_name}",
+        action="executed",
+        task_id=task_id,
+        input_tokens=total_input_tokens,
+        output_tokens=total_output_tokens,
+        duration_seconds=duration,
+        result="completed",
+        metadata={"iterations": iteration_count},
+    )
+
+    # Append file history to output so Revenant can verify
+    if files_written:
+        final_content += "\n\n## Files Created/Modified\n"
+        for fp in files_written:
+            final_content += f"- File written: {fp}\n"
+
+    return {
+        "output": final_content,
+        "input_tokens": total_input_tokens,
+        "output_tokens": total_output_tokens,
+    }
 
 
 async def process_task(
@@ -117,7 +269,7 @@ async def process_task(
 ) -> dict:
     """Process a task: decompose, delegate to Shades, audit with Revenant."""
     task_id = str(uuid.uuid4())
-    
+
     # Log Necromancer activation
     log_agent_call(
         session_id=session_id,
@@ -127,13 +279,13 @@ async def process_task(
         result="started",
         metadata={"project_root": project_root, "project_name": project_name},
     )
-    
+
     # Step 1: Necromancer decomposes the task
     necro_soul = load_soul(os.path.join(
         os.environ.get("REQUIEM_PROJECT_ROOT", "/home/prometeo/Requiem"),
         "necromancer", "soul.md"
     ))
-    
+
     decompose_prompt = f"""## Project: {project_name}
 ## Root: {project_root}
 
@@ -154,14 +306,14 @@ Respond in JSON format:
     }}
   ]
 }}"""
-    
+
     necro_result = await chat_completion(
         messages=[{"role": "user", "content": decompose_prompt}],
         model=NECROMANCER_MODEL,
         system_prompt=necro_soul,
         max_tokens=4096,
     )
-    
+
     log_agent_call(
         session_id=session_id,
         agent_name="necromancer",
@@ -171,7 +323,7 @@ Respond in JSON format:
         output_tokens=necro_result["output_tokens"],
         result="completed",
     )
-    
+
     # Parse subtasks (best effort JSON parse)
     subtasks = []
     try:
@@ -184,29 +336,29 @@ Respond in JSON format:
             subtasks = parsed.get("subtasks", [])
     except (json.JSONDecodeError, ValueError):
         pass
-    
+
     if not subtasks:
         # Fallback: single task to programming shade
         subtasks = [{"shade": "programming", "task": formal_task}]
-    
+
     # Step 2: Execute subtasks and audit each
     results = []
     for subtask in subtasks:
         shade_name = subtask.get("shade", "programming")
         shade_task = subtask.get("task", str(subtask))
-        
+
         retries = 0
         while retries < MAX_REVENANT_RETRIES:
             # Run the Shade
             shade_result = await run_shade(
                 shade_name, shade_task, project_root, session_id, task_id
             )
-            
-            # Audit with Revenant
+
+            # Audit with Revenant — now passes project_root so it can read actual files
             audit_result = await audit(
-                shade_result["output"], shade_task, session_id, task_id
+                shade_result["output"], shade_task, project_root, session_id, task_id
             )
-            
+
             if audit_result["verdict"] == "pass":
                 results.append({
                     "shade": shade_name,
@@ -231,7 +383,7 @@ Revenant feedback (attempt {retries}/{MAX_REVENANT_RETRIES}):
 {audit_result['feedback']}
 
 Please fix the issues and redo the task."""
-        
+
         if retries >= MAX_REVENANT_RETRIES:
             # Escalate to Raven
             log_agent_call(
@@ -249,7 +401,7 @@ Please fix the issues and redo the task."""
                 "feedback": audit_result["feedback"],
                 "escalated": True,
             })
-    
+
     # Log completion
     log_agent_call(
         session_id=session_id,
@@ -258,7 +410,7 @@ Please fix the issues and redo the task."""
         task_id=task_id,
         result="completed",
     )
-    
+
     return {
         "task_id": task_id,
         "results": results,
