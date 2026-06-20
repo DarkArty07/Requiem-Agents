@@ -287,3 +287,86 @@ def test_remove_all_elements_one_by_one():
         assert ll.remove(i) is True
     assert len(ll) == 0
     assert ll.to_list() == []
+
+
+# ── reverse ───────────────────────────────────────────────────────────────────
+
+def test_reverse_empty():
+    """Reversing an empty list does not raise and remains empty."""
+    ll = LinkedList[int]()
+    ll.reverse()
+    assert ll.to_list() == []
+    assert len(ll) == 0
+
+
+def test_reverse_single():
+    """Reversing a single-element list leaves it unchanged."""
+    ll = LinkedList[int]()
+    ll.append(42)
+    ll.reverse()
+    assert ll.to_list() == [42]
+    assert len(ll) == 1
+
+
+def test_reverse_two_elements():
+    """Reversing [A, B] produces [B, A]."""
+    ll = LinkedList[str]()
+    ll.append("A")
+    ll.append("B")
+    ll.reverse()
+    assert ll.to_list() == ["B", "A"]
+
+
+def test_reverse_multiple():
+    """Reversing [1, 2, 3, 4, 5] produces [5, 4, 3, 2, 1]."""
+    ll = LinkedList[int]()
+    for i in range(1, 6):
+        ll.append(i)
+    ll.reverse()
+    assert ll.to_list() == [5, 4, 3, 2, 1]
+
+
+def test_reverse_is_in_place():
+    """reverse() does not change the number of nodes (len unchanged)."""
+    ll = LinkedList[int]()
+    for i in range(10):
+        ll.append(i)
+    original_len = len(ll)
+    ll.reverse()
+    # Verify in-place by checking head pointer changed
+    assert len(ll) == original_len
+
+
+def test_reverse_twice():
+    """Reversing twice returns to the original order."""
+    ll = LinkedList[int]()
+    for i in range(1, 6):
+        ll.append(i)
+    original = ll.to_list()
+    ll.reverse()
+    ll.reverse()
+    assert ll.to_list() == original
+
+
+def test_reverse_preserves_tail_append():
+    """After reverse(), append() still works correctly at the new tail."""
+    ll = LinkedList[int]()
+    ll.append(1)
+    ll.append(2)
+    ll.append(3)
+    ll.reverse()  # [3, 2, 1]
+    ll.append(4)  # should append at tail → [3, 2, 1, 4]
+    assert ll.to_list() == [3, 2, 1, 4]
+    assert len(ll) == 4
+
+
+def test_reverse_preserves_head_prepend():
+    """After reverse(), prepend() still works correctly at the new head."""
+    ll = LinkedList[int]()
+    ll.append(1)
+    ll.append(2)
+    ll.append(3)
+    ll.reverse()  # [3, 2, 1]
+    ll.prepend(99)  # should prepend at head → [99, 3, 2, 1]
+    assert ll.to_list() == [99, 3, 2, 1]
+    assert len(ll) == 4

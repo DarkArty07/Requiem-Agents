@@ -139,6 +139,36 @@ class LinkedList(Generic[T]):
             current = current.next
         return False
 
+    def reverse(self) -> None:
+        """Reverse the linked list in-place.
+
+        Traverses the list once, reversing each node's next pointer, then
+        swaps the head and tail references. Operates in O(n) time and O(1)
+        space. If the list is empty or has a single element, returns early.
+
+        Examples:
+            >>> ll = LinkedList[int]()
+            >>> ll.append(1); ll.append(2); ll.append(3)
+            >>> ll.reverse()
+            >>> ll.to_list()
+            [3, 2, 1]
+        """
+        if self._head is None or self._head is self._tail:
+            return
+
+        old_head = self._head
+        prev: Optional[LinkedList._Node] = None
+        current: Optional[LinkedList._Node] = self._head
+
+        while current is not None:
+            next_node = current.next
+            current.next = prev
+            prev = current
+            current = next_node
+
+        self._tail = old_head
+        self._head = prev
+
     def to_list(self) -> list[T]:
         """Convert the linked list to a Python list, preserving order.
 
