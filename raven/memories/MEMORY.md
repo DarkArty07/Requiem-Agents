@@ -1,0 +1,1 @@
+Requiem project structure: src/ for implementations, tests/ for pytest tests, requiem/ for Necromancer-friendly bridge modules that re-export from src/, shared/ for shared utilities (eval, session_monitor, opencode_client). The Necromancer may create bridge modules (e.g., requiem/csv_tools.py) that inject src/ into sys.path so tests can import from requiem.xxx.
