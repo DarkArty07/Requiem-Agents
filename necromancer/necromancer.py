@@ -189,6 +189,8 @@ async def run_shade(
     tool_instructions = _build_tool_instructions(tools)
     system_prompt = base_system_prompt + tool_instructions
 
+    print(f"  [Shade {shade_name}] Tools: {list(tools.keys())}", flush=True)
+
     # Build initial task message
     user_message = f"""## Project Root
 {project_root}
@@ -387,6 +389,10 @@ Respond in JSON format:
     if not subtasks:
         # Fallback: single task to programming shade
         subtasks = [{"shade": "programming", "task": formal_task}]
+
+    print(f"\n[ Necromancer ] Decomposed into {len(subtasks)} subtasks:", flush=True)
+    for i, st in enumerate(subtasks):
+        print(f"  Subtask {i+1}: shade={st.get('shade', 'programming')}, task={st.get('task', str(st))[:100]}", flush=True)
 
     # Step 2: Execute subtasks and audit each
     results = []

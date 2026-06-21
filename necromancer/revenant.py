@@ -168,7 +168,9 @@ async def audit(
     if not compile_results:
         compile_results = "(No .py files to compile.)"
 
-    task_context = "This was an execution task. Verify the command output is complete and accurate." if is_execution_task and not file_paths else ""
+    task_context = "This was an execution task. Verify the command output is complete and accurate. DO NOT fail because tests have failures — judge whether the Shade ran the commands and reported results correctly." if is_execution_task else ""
+
+    print(f"  [Revenant] is_creation={is_creation_task}, is_execution={is_execution_task}, has_files={bool(file_paths)}, has_terminal={has_terminal_output}", flush=True)
 
     user_message = f"""Review the following Shade output for the task specification.
 
