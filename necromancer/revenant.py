@@ -126,13 +126,16 @@ async def audit(
     # Extract file paths from Shade output and read actual files
     file_paths = extract_file_paths(shade_output, project_root)
 
+    # Check if Shade ran terminal commands (don't auto-fail if it did useful execution work)
+    has_terminal_output = "Tool result (terminal):" in shade_output or "tool_result" in shade_output.lower()
+
     # Pre-check: if task requires creating files but none exist, auto-fail
     task_lower = task_spec.lower()
     creation_words = ['create', 'write', 'implement', 'build', 'add', 'generate']
     is_creation_task = any(w in task_lower for w in creation_words)
     execution_words = ['run', 'test', 'execute', 'check', 'find', 'report', 'lint', 'pytest', 'audit', 'diagnose']
     is_execution_task = any(w in task_lower for w in execution_words)
-    if shade_name == "programming" and is_creation_task and not is_execution_task and not file_paths:
+    if shade_name == "programming" and is_creation_task and not is_execution_task and not file_paths and not has_terminal_output:
         duration = time.time() - start_time
         log_agent_call(
             session_id=session_id, agent_name='revenant',

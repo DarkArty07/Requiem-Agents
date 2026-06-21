@@ -1,0 +1,107 @@
+============================= test session starts ==============================
+platform linux -- Python 3.11.15, pytest-9.1.1, pluggy-1.6.0 -- /home/prometeo/Requiem/raven/.venv/bin/python
+cachedir: .pytest_cache
+rootdir: /home/prometeo/Requiem
+configfile: pytest.ini
+plugins: anyio-4.14.0
+collecting ... collected 179 items
+
+tests/test_csv_to_json.py::TestCsvToJson::test_basic_conversion PASSED   [  0%]
+tests/test_csv_to_json.py::TestCsvToJson::test_different_delimiter PASSED [  1%]
+tests/test_csv_to_json.py::TestCsvToJson::test_empty_csv_only_headers PASSED [  1%]
+tests/test_csv_to_json.py::TestCsvToJson::test_file_not_found PASSED     [  2%]
+tests/test_csv_to_json.py::TestCsvToJson::test_quoted_fields_with_commas PASSED [  2%]
+tests/test_csv_to_json.py::TestCsvToJson::test_utf8_special_characters PASSED [  3%]
+tests/test_csv_to_json.py::TestCsvToJson::test_utf8_with_uppercase_n_tilde PASSED [  3%]
+tests/test_dashboard_api.py::TestSessions::test_get_sessions_empty PASSED [  4%]
+tests/test_dashboard_api.py::TestStats::test_get_stats PASSED            [  5%]
+tests/test_dashboard_api.py::TestConfig::test_get_config PASSED          [  5%]
+tests/test_dashboard_api.py::TestConfig::test_post_config PASSED         [  6%]
+tests/test_dashboard_api.py::TestActivity::test_get_activity PASSED      [  6%]
+tests/test_eval.py::TestInitDb::test_init_db PASSED                      [  7%]
+tests/test_eval.py::TestLogAgentCall::test_log_agent_call PASSED         [  7%]
+tests/test_eval.py::TestGetEvalReport::test_get_eval_report_empty PASSED [  8%]
+tests/test_eval.py::TestGetEvalReport::test_get_eval_report_with_data PASSED [  8%]
+tests/test_eval.py::TestGetEvalReport::test_get_eval_report_cost PASSED  [  9%]
+tests/test_linked_list.py::test_empty_list_len_zero PASSED               [ 10%]
+tests/test_linked_list.py::test_empty_list_to_list PASSED                [ 10%]
+tests/test_linked_list.py::test_empty_list_iteration PASSED              [ 11%]
+tests/test_linked_list.py::test_empty_list_len_zero PASSED               [ 10%]
+tests/test_linked_list.py::test_empty_list_to_list PASSED                [ 10%]
+tests/test_linked_list.py::test_empty_list_iteration PASSED              [ 11%]
+tests/test_linked_list.py::test_empty_list_len_zero PASSED               [ 10%]
+tests/test_linked_list.py::test_empty_list_to_list PASSED                [ 10%]
+tests/test_linked_list.py::test_empty_list_iteration PASSED              [ 11%]
+tests/test_linked_list.py::test_empty_list_len_zero PASSED               [ 10%]
+tests/test_linked_list.py::test_empty_list_to_list PASSED                [ 10%]
+tests/test_linked_list.py::test_empty_list_iteration PASSED              [ 11%]
+tests/test_linked_list.py::test_empty_list_len_zero PASSED               [ 10%]
+tests/test_linked_list.py::test_empty_list_to_list PASSED                [ 10%]
+tests/test_linked_list.py::test_empty_list_iteration PASSED              [ 11%]
+tests/test_linked_list.py::test_empty_list_len_zero PASSED               [ 10%]
+tests/test_linked_list.py::test_empty_list_to_list PASSED                [ 10%]
+tests/test_linked_list.py::test_empty_list_iteration PASSED              [ 11%]
+tests/test_linked_list.py::test_empty_list_len_zero PASSED               [ 10%]
+tests/test_linked_list.py::test_empty_list_to_list PASSED                [ 10%]
+tests/test_linked_list.py::test_empty_list_iteration PASSED              [ 11%]
+tests/test_linked_list.py::test_empty_list_len_zero PASSED               [ 10%]
+tests/test_linked_list.py::test_empty_list_to_list PASSED                [ 10%]
+tests/test_linked_list.py::test_empty_list_iteration PASSED              [ 11%]
+tests/test_linked_list.py::test_empty_list_len_zero PASSED               [ 10%]
+tests/test_linked_list.py::test_empty_list_to_list PASSED                [ 10%]
+tests/test_linked_list.py::test_empty_list_iteration PASSED              [ 11%]
+tests/test_linked_list.py::test_empty_list_len_zero PASSED               [ 10%]
+tests/test_linked_list.py::test_empty_list_to_list PASSED                [ 10%]
+tests/test_linked_list.py::test_empty_list_iteration PASSED              [ 11%]
+... (truncated for brevity, full output written)
+
+tests/test_user_model.py::test_create_user PASSED                        [ 94%]
+tests/test_user_model.py::test_find_user PASSED                          [ 95%]
+tests/test_user_model.py::test_find_nonexistent_user PASSED              [ 96%]
+tests/test_user_model.py::test_update_user PASSED                        [ 96%]
+tests/test_user_model.py::test_delete_user PASSED                        [ 97%]
+tests/test_user_model.py::test_delete_unsaved_user PASSED                [ 97%]
+tests/test_user_model.py::test_user_repr PASSED                          [ 98%]
+tests/test_user_model.py::test_multiple_users PASSED                     [ 98%]
+tests/test_user_model.py::test_user_missing_fields PASSED                [ 99%]
+tests/test_user_model.py::test_user_email_unique PASSED                  [100%]
+
+=================================== FAILURES ===================================
+____________________ TestStress.test_stress_eviction_order _____________________
+
+self = <tests.test_lru_cache.TestStress object at 0x7003182d7fd0>
+
+    def test_stress_eviction_order(self):
+        """Insert more than capacity and verify strict LRU ordering."""
+        N = 100
+        cache = LRUCache(N)
+    
+        # Insert N items
+        for i in range(N):
+            cache.put(i, i)
+    
+        # Access first half to make them MRU
+        for i in range(N // 2):
+            cache.get(i)
+    
+        # Insert N more items — each should evict the oldest untouched
+        # After the gets above, order is [N//2, N//2+1, ..., N-1, 0, 1, ..., N//2-1]
+        for j in range(N, N + N):
+            cache.put(j, j)
+    
+        # The first N//2 evicted should be the untouched ones: N//2 .. N-1
+        for i in range(N // 2, N):
+            assert cache.get(i) is None, f"Key {i} should have been evicted"
+    
+        # The remaining should be [0..N//2-1] and [N..N+N-1]
+        assert cache.size() == N
+        for i in range(N // 2):
+>           assert cache.get(i) == i
+E           assert None == 0
+E            +  where None = get(0)
+E            +    where get = <src.lru_cache.LRUCache object at 0x7003182d7fd0>.get
+
+tests/test_lru_cache.py:396: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_lru_cache.py::TestStress::test_stress_eviction_order - assertion: assert None == 0
+========================= 1 failed, 178 passed in 0.45s ==========================
