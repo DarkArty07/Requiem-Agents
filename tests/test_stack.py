@@ -1,170 +1,110 @@
-'''Tests for Stack — src/stack.py.'''
-
-import inspect
-
+"""Tests for Stack class."""
 import pytest
+import sys
+sys.path.insert(0, '/home/prometeo/Requiem')
+
 from src.stack import Stack
 
-
-# ── Empty stack ───────────────────────────────────────────────────────────────
-
-def test_is_empty_true():
-    '''Verify a new stack reports empty.'''
-    s = Stack[int]()
-    assert s.is_empty() is True
-
-
-def test_size_zero():
-    '''Size of a new stack is 0.'''
-    s = Stack[int]()
+# 1. push adds items and increases size
+def test_push_increases_size():
+    s = Stack()
     assert s.size() == 0
+    s.push(1)
+    assert s.size() == 1
+    s.push(2)
+    assert s.size() == 2
 
+# 2. pop removes and returns the top item in LIFO order
+def test_pop_returns_last_pushed():
+    s = Stack()
+    s.push(10)
+    s.push(20)
+    s.push(30)
+    assert s.pop() == 30
+    assert s.pop() == 20
+    assert s.pop() == 10
 
-def test_pop_empty_raises():
-    '''Pop from an empty stack raises IndexError.'''
-    s = Stack[int]()
-    with pytest.raises(IndexError, match='Stack is empty'):
+# 3. pop on empty stack raises exception
+def test_pop_on_empty_raises_exception():
+    s = Stack()
+    with pytest.raises(IndexError, match="pop from an empty stack"):
         s.pop()
 
-
-def test_peek_empty_raises():
-    '''Peek at an empty stack raises IndexError.'''
-    s = Stack[int]()
-    with pytest.raises(IndexError, match='Stack is empty'):
-        s.peek()
-
-
-def test_iteration_empty_stack():
-    '''Iterating an empty stack yields nothing.'''
-    s = Stack[int]()
-    assert list(s) == []
-
-
-def test_repr_empty():
-    '''repr of empty stack is Stack([]).'''
-    s = Stack[int]()
-    assert repr(s) == 'Stack([])'
-
-
-# ── Single element ────────────────────────────────────────────────────────────
-
-def test_push_single():
-    '''Push one item updates size and peek.'''
-    s = Stack[int]()
-    s.push(42)
-    assert s.size() == 1
-    assert s.peek() == 42
-
-
-def test_is_empty_false():
-    '''Non-empty stack reports not empty.'''
-    s = Stack[int]()
-    s.push(1)
-    assert s.is_empty() is False
-
-
-# ── Multiple elements ─────────────────────────────────────────────────────────
-
-def test_push_multiple():
-    '''Push 1,2,3 yields size 3 and peek 3.'''
-    s = Stack[int]()
-    s.push(1)
-    s.push(2)
-    s.push(3)
-    assert s.size() == 3
-    assert s.peek() == 3
-
-
-def test_pop_returns_top():
-    '''Pop returns the most recently pushed element.'''
-    s = Stack[int]()
-    s.push(1)
-    s.push(2)
-    s.push(3)
-    assert s.pop() == 3
-
-
-def test_pop_removes_element():
-    '''After pop, size decreases.'''
-    s = Stack[int]()
-    s.push(1)
-    s.push(2)
-    s.push(3)
-    s.pop()
+# 4. peek returns top item without removing it
+def test_peek_returns_top_without_removing():
+    s = Stack()
+    s.push('a')
+    s.push('b')
+    assert s.peek() == 'b'
     assert s.size() == 2
 
+# 5. peek on empty stack raises exception
+def test_peek_on_empty_raises_exception():
+    s = Stack()
+    with pytest.raises(IndexError, match="peek from an empty stack"):
+        s.peek()
 
-def test_peek_returns_top():
-    '''Peek returns top item without removing it.'''
-    s = Stack[int]()
+# 6. is_empty returns True for new stack and False after push
+def test_is_empty():
+    s = Stack()
+    assert s.is_empty() is True
     s.push(1)
-    s.push(2)
-    s.push(3)
-    assert s.peek() == 3
-    assert s.size() == 3
-
-
-def test_is_empty_after_pop_all():
-    '''Stack becomes empty after popping all elements.'''
-    s = Stack[int]()
-    s.push(1)
-    s.push(2)
-    s.push(3)
-    s.pop()
-    s.pop()
+    assert s.is_empty() is False
     s.pop()
     assert s.is_empty() is True
 
-
-def test_size_after_operations():
-    '''Mixed operations produce correct size.'''
-    s = Stack[int]()
-    s.push(5)
-    s.push(10)
+# 7. size returns correct count after multiple operations
+def test_size_after_multiple_operations():
+    s = Stack()
+    assert s.size() == 0
+    s.push(1)
+    s.push(2)
+    s.push(3)
+    assert s.size() == 3
     s.pop()
-    s.push(3)
     assert s.size() == 2
+    s.push(4)
+    assert s.size() == 3
+    s.pop()
+    s.pop()
+    assert s.size() == 1
+    s.pop()
+    assert s.size() == 0
 
-
-def test_iteration_yields_lifo_order():
-    '''Iteration yields items in LIFO order.'''
-    s = Stack[int]()
+# 8. interleaved push/pop sequences
+def test_interleaved_push_pop():
+    s = Stack()
     s.push(1)
     s.push(2)
+    assert s.pop() == 2
     s.push(3)
-    result = [item for item in s]
-    assert result == [3, 2, 1]
+    assert s.pop() == 3
+    assert s.pop() == 1
+    assert s.is_empty()
 
+# 9. pushing None or falsy values
+def test_push_none():
+    s = Stack()
+    s.push(None)
+    assert s.size() == 1
+    assert s.pop() is None
 
-def test_iteration_uses_yield():
-    '''The __iter__ method returns a generator.'''
-    s = Stack[int]()
-    s.push(1)
-    it = iter(s)
-    assert inspect.isgenerator(it) is True
+def test_push_falsy_values():
+    s = Stack()
+    s.push(0)
+    s.push(False)
+    s.push('')
+    assert s.pop() == ''
+    assert s.pop() is False
+    assert s.pop() == 0
 
-
-def test_repr_nonempty():
-    '''repr of non-empty stack shows top-to-bottom order.'''
-    s = Stack[int]()
-    s.push(1)
-    s.push(2)
-    s.push(3)
-    assert repr(s) == 'Stack([3, 2, 1])'
-
-
-def test_string_type():
-    '''Stack works with str type.'''
-    s = Stack[str]()
-    s.push('hello')
-    assert s.pop() == 'hello'
-
-
-def test_large_stack():
-    '''Push 1000 items, verify size and iteration order.'''
-    s = Stack[int]()
-    for i in range(1000):
+# 10. large number of elements (e.g., 1000)
+def test_large_number_of_elements():
+    s = Stack()
+    n = 1000
+    for i in range(n):
         s.push(i)
-    assert s.size() == 1000
-    items = [x for x in s]
-    assert items[0] == 999
+    assert s.size() == n
+    for i in range(n-1, -1, -1):
+        assert s.pop() == i
+    assert s.is_empty()

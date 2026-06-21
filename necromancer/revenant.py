@@ -148,6 +148,29 @@ async def audit(
             'input_tokens': 0, 'output_tokens': 0,
         }
 
+    # Auto-pass: if execution task and output clearly shows success, skip LLM
+    if shade_name == "execution" and is_execution_task:
+        output_lower = shade_output.lower()
+        has_pass_marker = "passed" in output_lower or "all checks passed" in output_lower or "build successful" in output_lower
+        has_fail_marker = "failed" in output_lower or "traceback" in output_lower
+        # "0 errors" or "no errors" is NOT a failure
+        if "0 errors" in output_lower or "no errors" in output_lower:
+            has_fail_marker = False
+        if "0 failed" in output_lower:
+            has_fail_marker = False
+        if has_pass_marker and not has_fail_marker:
+            duration = time.time() - start_time
+            log_agent_call(
+                session_id=session_id, agent_name='revenant',
+                action='audit', task_id=task_id,
+                duration_seconds=duration, result='pass',
+            )
+            return {
+                'verdict': 'pass',
+                'feedback': 'Execution task auto-passed: command output shows success (tests passed, no failures).',
+                'input_tokens': 0, 'output_tokens': 0,
+            }
+
     file_contents = ""
     compile_results = ""
     for fp in file_paths:

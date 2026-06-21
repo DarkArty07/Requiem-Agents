@@ -309,6 +309,62 @@ Execute this task using your tools."""
     }
 
 
+def _override_shade(shade_name: str, task_text: str) -> str:
+    """Override LLM shade selection based on task text pattern matching.
+    
+    The LLM doesn't always follow routing rules in soul.md.
+    This function provides deterministic routing for clear cases.
+    """
+    task_lower = task_text.lower()
+    
+    # Execution keywords — running commands, testing, reporting
+    execution_patterns = [
+        "run pytest", "run tests", "execute tests", "run the test",
+        "pytest", "run lint", "run flake", "run mypy",
+        "build the project", "compile", "deploy",
+        "install dependencies", "pip install", "npm install",
+        "run the script", "execute the command", "run the command",
+        "start the server", "stop the server",
+        "benchmark", "measure performance", "profile",
+        "run and report", "execute and report",
+    ]
+    
+    # Creation keywords — writing new code/files
+    creation_patterns = [
+        "create a class", "create a function", "create a module",
+        "write a class", "write a function", "write a script",
+        "implement a", "implement the",
+        "build a class", "build a function",
+        "make a class", "make a function",
+    ]
+    
+    # Research keywords — investigation, reading, analysis
+    research_patterns = [
+        "investigate", "analyze the code", "analyse the code",
+        "read the code", "understand the code",
+        "explore the codebase", "explore the project",
+        "find bugs", "find issues", "find problems",
+        "search for", "look for",
+        "review the code", "audit the code",
+    ]
+    
+    # Check execution FIRST — if task is purely about running things
+    is_execution = any(p in task_lower for p in execution_patterns)
+    is_creation = any(p in task_lower for p in creation_patterns)
+    is_research = any(p in task_lower for p in research_patterns)
+    
+    # If task mentions running tests AND creating code, it's creation (tests come after)
+    if is_execution and not is_creation and not is_research:
+        return "execution"
+    
+    # If task is purely research
+    if is_research and not is_creation and not is_execution:
+        return "research"
+    
+    # Default: keep LLM's choice (or programming)
+    return shade_name
+
+
 async def process_task(
     project_root: str,
     project_name: str,
@@ -399,6 +455,11 @@ Respond in JSON format:
     for subtask in subtasks:
         shade_name = subtask.get("shade", "programming")
         shade_task = subtask.get("task", str(subtask))
+        # Code-level override: fix LLM's shade selection when it doesn't follow routing rules
+        original_shade = shade_name
+        shade_name = _override_shade(shade_name, shade_task)
+        if shade_name != original_shade:
+            print(f"  [Routing Override] {original_shade} -> {shade_name} (pattern match)", flush=True)
 
         retries = 0
         while retries < MAX_REVENANT_RETRIES:

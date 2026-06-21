@@ -383,16 +383,16 @@ class TestStress:
 
         # Insert N more items — each should evict the oldest untouched
         # After the gets above, order is [N//2, N//2+1, ..., N-1, 0, 1, ..., N//2-1]
-        for j in range(N, N + N):
+        for j in range(N, N + N // 2):
             cache.put(j, j)
 
         # The first N//2 evicted should be the untouched ones: N//2 .. N-1
         for i in range(N // 2, N):
             assert cache.get(i) is None, f"Key {i} should have been evicted"
 
-        # The remaining should be [0..N//2-1] and [N..N+N-1]
+        # The remaining should be [0..N//2-1] and [N..N+N//2-1]
         assert cache.size() == N
         for i in range(N // 2):
             assert cache.get(i) == i
-        for j in range(N, N + N):
+        for j in range(N, N + N // 2):
             assert cache.get(j) == j
