@@ -302,6 +302,13 @@ Execute this task using your tools."""
         for fp in files_written:
             final_content += f"- File written: {fp}\n"
 
+    # For execution shades, append terminal tool results to output
+    # so Revenant\'s auto-pass can detect "passed" in the output
+    if shade_name == "execution":
+        for msg in messages:
+            if msg["role"] == "user" and "Tool result (terminal):" in msg["content"]:
+                final_content += "\n" + msg["content"]
+
     return {
         "output": final_content,
         "input_tokens": total_input_tokens,
