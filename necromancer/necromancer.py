@@ -12,7 +12,7 @@ sys.path.insert(0, os.environ.get("REQUIEM_PROJECT_ROOT", "/home/prometeo/Requie
 
 from shared.opencode_client import chat_completion
 from shared.eval import log_agent_call
-from necromancer.tools import execute_tool, WRITE_TOOLS, RESEARCH_TOOLS
+from necromancer.tools import execute_tool, WRITE_TOOLS, RESEARCH_TOOLS, EXECUTION_TOOLS
 from necromancer.revenant import audit
 
 NECROMANCER_MODEL = os.environ.get("NECROMANCER_MODEL", "glm-5.2")
@@ -178,6 +178,9 @@ async def run_shade(
     elif shade_name == "research":
         tools = RESEARCH_TOOLS
         model = SHADE_MODEL
+    elif shade_name == "execution":
+        tools = EXECUTION_TOOLS
+        model = SHADE_MODEL
     else:
         tools = WRITE_TOOLS
         model = SHADE_MODEL
@@ -339,12 +342,13 @@ async def process_task(
 Decompose this task into subtasks for your Shades. Available Shades:
 - Shade of Programming (writes code, modifies files, runs commands)
 - Shade of Research (reads code, searches files, investigates)
+- Shade of Execution (runs commands, executes tests, reports results)
 
 Respond in JSON format:
 {{
   "subtasks": [
     {{
-      "shade": "programming" or "research",
+      "shade": "programming" or "research" or "execution",
       "task": "specific task description"
     }}
   ]

@@ -130,7 +130,9 @@ async def audit(
     task_lower = task_spec.lower()
     creation_words = ['create', 'write', 'implement', 'build', 'add', 'generate']
     is_creation_task = any(w in task_lower for w in creation_words)
-    if shade_name == "programming" and is_creation_task and not file_paths:
+    execution_words = ['run', 'test', 'execute', 'check', 'find', 'report', 'lint', 'pytest', 'audit', 'diagnose']
+    is_execution_task = any(w in task_lower for w in execution_words)
+    if shade_name == "programming" and is_creation_task and not is_execution_task and not file_paths:
         duration = time.time() - start_time
         log_agent_call(
             session_id=session_id, agent_name='revenant',
@@ -155,10 +157,15 @@ async def audit(
                 compile_results += compile_py_file(fp) + "\n"
 
     if not file_contents:
-        file_contents = "(No files found to verify — Shade may not have created any files, or paths could not be extracted.)"
+        if is_execution_task and not file_paths:
+            file_contents = "(Execution task — no files expected)"
+        else:
+            file_contents = "(No files found to verify — Shade may not have created any files, or paths could not be extracted.)"
 
     if not compile_results:
         compile_results = "(No .py files to compile.)"
+
+    task_context = "This was an execution task. Verify the command output is complete and accurate." if is_execution_task and not file_paths else ""
 
     user_message = f"""Review the following Shade output for the task specification.
 
@@ -178,7 +185,8 @@ async def audit(
 Provide your verdict in this format:
 - VERDICT: PASS or FAIL
 - REASON: [if FAIL, specific actionable feedback]
-- SUGGESTION: [optional improvement]"""
+- SUGGESTION: [optional improvement]
+{task_context}"""
 
     messages = [{"role": "user", "content": user_message}]
 

@@ -91,6 +91,12 @@ RESEARCH_TOOLS = {
     "search_files": search_files,
 }
 
+EXECUTION_TOOLS = {
+    "read_file": read_file,
+    "search_files": search_files,
+    "terminal": run_terminal,
+}
+
 
 def execute_tool(tool_name: str, tool_registry: dict, **kwargs) -> str:
     """Execute a tool from a registry."""

@@ -2,6 +2,7 @@ model:
   provider: opencode-go
   model: deepseek-v4-pro
   context_length: 262144
+  default: glm-5.2
 memory:
   memory_char_limit: 32000
   user_char_limit: 24000
@@ -15,8 +16,8 @@ mcp_servers:
   requiem-mcp:
     command: /home/prometeo/Requiem/raven/.venv/bin/python3.11
     args:
-    - -m
-    - requiem_mcp.server
+      - -m
+      - requiem_mcp.server
     enabled: true
     env:
       REQUIEM_PROJECT_ROOT: /home/prometeo/Requiem
