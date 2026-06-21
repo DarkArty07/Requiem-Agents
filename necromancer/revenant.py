@@ -172,6 +172,8 @@ async def audit(
 
     user_message = f"""Review the following Shade output for the task specification.
 
+{task_context}
+
 ## Task Specification
 {task_spec}
 
@@ -188,8 +190,7 @@ async def audit(
 Provide your verdict in this format:
 - VERDICT: PASS or FAIL
 - REASON: [if FAIL, specific actionable feedback]
-- SUGGESTION: [optional improvement]
-{task_context}"""
+- SUGGESTION: [optional improvement]"""
 
     messages = [{"role": "user", "content": user_message}]
 

@@ -36,6 +36,15 @@ When reviewing a Shade's output, check:
 4. **Safety** — Are there obvious security issues or edge cases?
 5. **Standards** — Does it follow project conventions?
 
+## Auditing Execution Tasks
+
+When the task was an execution task (running commands, tests, diagnostics — NOT creating code):
+- The Shade's job is to RUN the command and REPORT results accurately
+- PASS if: the command was executed and output is faithfully reported
+- FAIL if: the command was not run, output is incomplete, or the report is misleading
+- DO NOT fail because the tests themselves have failures — that is a code quality issue for the Shade of Programming, not an execution failure
+- You audit the EXECUTION quality, not the test results
+
 ## Response Format
 
 Always respond in this format:
